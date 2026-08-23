@@ -1,96 +1,116 @@
-// API Base URL (change if deploying)
-const API_BASE_URL = 'http://localhost:8000';
+// API Base URL
+const API_BASE_URL = 'http://127.0.0.1:8001';
 
-// Smooth scroll to analyze section
-function scrollToAnalyze() {
-    document.getElementById('analyze').scrollIntoView({ behavior: 'smooth' });
+// DOM Elements
+const analyzeBtn = document.getElementById('analyzeBtn');
+const loadingIndicator = document.getElementById('loadingIndicator');
+const resultsSection = document.getElementById('resultsSection');
+const riskScoreValue = document.getElementById('riskScoreValue');
+const riskScoreCircle = document.getElementById('riskScoreCircle');
+const riskLevel = document.getElementById('riskLevel');
+const verdict = document.getElementById('verdict');
+
+// Analyze button click handler
+if (analyzeBtn) {
+    analyzeBtn.addEventListener('click', analyzeOpportunity);
 }
 
-// Form submission handler
-document.getElementById('scamForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
+// Analyze opportunity function
+async function analyzeOpportunity() {
+    // Get form values
+    const companyName = document.getElementById('companyName').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const website = document.getElementById('website').value.trim();
+    const jobDescription = document.getElementById('jobDescription').value.trim();
+    const salary = document.getElementById('salary').value.trim();
 
-    // Get form data
-    const formData = {
-        company_name: document.getElementById('companyName').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value,
-        website: document.getElementById('website').value,
-        job_description: document.getElementById('jobDescription').value,
-        salary: document.getElementById('salary').value
+    // Validation
+    if (!companyName || !email || !jobDescription) {
+        alert('Please fill in all required fields (Company Name, Email, Job Description)');
+        return;
+    }
+
+    // Show loading
+    showLoading();
+
+    // Prepare request data
+    const requestData = {
+        company_name: companyName,
+        email: email,
+        phone: phone,
+        website: website,
+        job_description: jobDescription,
+        salary: salary
     };
 
-    // Show loading, hide form and results
-    document.getElementById('scamForm').style.display = 'none';
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('loading').style.display = 'block';
-
     try {
-        // Send to backend
+        // Send request to backend
         const response = await fetch(`${API_BASE_URL}/analyze`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(requestData)
         });
 
         if (!response.ok) {
-            throw new Error('Analysis failed');
+            let detail = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                detail = errorData.detail || detail;
+            } catch {
+                // Keep the HTTP status when the server returns non-JSON data.
+            }
+            throw new Error(detail);
         }
 
         const data = await response.json();
 
-        // Hide loading, show results
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('results').style.display = 'block';
-
-        // Display results
+        // Hide loading and show results
+        hideLoading();
         displayResults(data);
 
-        // Scroll to results
-        document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-
     } catch (error) {
-        console.error('Error:', error);
-        alert('Analysis failed. Please try again.');
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('scamForm').style.display = 'block';
+        console.error('Analysis error:', error);
+        hideLoading();
+        alert(`Analysis failed: ${error.message}`);
     }
-});
+}
 
 // Display analysis results
 function displayResults(data) {
     // Update risk score circle
-    const riskScore = data.overall_risk_score;
-    const riskCircle = document.getElementById('riskScoreCircle');
-    const riskValue = document.getElementById('riskScoreValue');
-    const riskLevel = document.getElementById('riskLevel');
-    const verdict = document.getElementById('verdict');
+    const riskScore = Math.min(100, Math.max(0, Number(data.overall_risk_score) || 0));
+
+    console.log('Risk Score:', riskScore); // Debug log
 
     // Animate score
-    animateValue(riskValue, 0, riskScore, 1000);
+    animateValue(riskScoreValue, 0, Math.round(riskScore), 1000);
 
-    // Set color based on risk
+    // Set color based on risk (FIXED)
     let gradientColor;
+    let riskText;
+
     if (riskScore >= 70) {
-        gradientColor = '#ef4444'; // Red
-        riskLevel.textContent = 'HIGH RISK';
-        riskLevel.className = 'text-danger';
+        gradientColor = '#ef4444'; // Red - HIGH RISK
+        riskText = 'HIGH RISK';
+        riskLevel.className = 'risk-level text-danger';
     } else if (riskScore >= 40) {
-        gradientColor = '#f59e0b'; // Orange
-        riskLevel.textContent = 'MEDIUM RISK';
-        riskLevel.className = 'text-warning';
+        gradientColor = '#f59e0b'; // Orange - MEDIUM RISK
+        riskText = 'MEDIUM RISK';
+        riskLevel.className = 'risk-level text-warning';
     } else {
-        gradientColor = '#10b981'; // Green
-        riskLevel.textContent = 'LOW RISK';
-        riskLevel.className = 'text-success';
+        gradientColor = '#10b981'; // Green - LOW RISK
+        riskText = 'LOW RISK';
+        riskLevel.className = 'risk-level text-success';
     }
 
-    // Update circle gradient
+    // Update circle gradient (FIXED - use proper percentage)
     const degrees = (riskScore / 100) * 360;
     riskCircle.style.background = `conic-gradient(${gradientColor} ${degrees}deg, var(--border-color) ${degrees}deg)`;
 
+    riskLevel.textContent = riskText;
     verdict.textContent = data.verdict;
 
     // Display URL analysis
@@ -104,209 +124,163 @@ function displayResults(data) {
 
     // Display recommendations
     displayRecommendations(data.recommendations);
+
+    // Show results section
+    if (resultsSection) {
+        resultsSection.style.display = 'block';
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
-// Animate number value
+// Animate value
 function animateValue(element, start, end, duration) {
-    const range = end - start;
-    const increment = end > start ? 1 : -1;
-    const stepTime = Math.abs(Math.floor(duration / range));
-    let current = start;
-
-    const timer = setInterval(() => {
-        current += increment;
-        element.textContent = Math.round(current);
-        if (current === end) {
-            clearInterval(timer);
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        element.textContent = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
         }
-    }, stepTime);
+    };
+    window.requestAnimationFrame(step);
 }
 
 // Display URL analysis
-function displayURLAnalysis(urlData) {
-    const container = document.getElementById('urlAnalysis');
+function displayURLAnalysis(urlAnalysis) {
+    const urlRiskScore = document.getElementById('urlRiskScore');
+    const sslStatus = document.getElementById('sslStatus');
 
-    if (!urlData || Object.keys(urlData).length === 0) {
-        container.innerHTML = '<p class="text-secondary">No website provided</p>';
-        return;
+    if (urlRiskScore && urlAnalysis.overall_risk_score !== undefined) {
+        urlRiskScore.textContent = `${Math.round(urlAnalysis.overall_risk_score)}/100`;
     }
 
-    let html = '';
-
-    // Domain age
-    if (urlData.domain_age && urlData.domain_age.status === 'success') {
-        const age = urlData.domain_age.age_days;
-        const ageClass = age > 365 ? 'text-success' : age > 180 ? 'text-warning' : 'text-danger';
-        html += `
-            <div class="analysis-item">
-                <strong>Domain Age:</strong> 
-                <span class="${ageClass}">${age} days (${urlData.domain_age.creation_date})</span>
-            </div>
-        `;
+    if (sslStatus && urlAnalysis.has_ssl !== undefined) {
+        if (urlAnalysis.has_ssl) {
+            sslStatus.innerHTML = '<span style="color: #10b981;">✓ HTTPS Enabled</span>';
+        } else {
+            sslStatus.innerHTML = '<span style="color: #ef4444;">✗ No HTTPS</span>';
+        }
     }
-
-    // SSL Certificate
-    if (urlData.ssl_certificate) {
-        const sslClass = urlData.ssl_certificate.has_ssl ? 'text-success' : 'text-danger';
-        const sslIcon = urlData.ssl_certificate.has_ssl ? '✓' : '✗';
-        html += `
-            <div class="analysis-item">
-                <strong>SSL Certificate:</strong> 
-                <span class="${sslClass}">${sslIcon} ${urlData.ssl_certificate.has_ssl ? 'Valid HTTPS' : 'No HTTPS'}</span>
-            </div>
-        `;
-    }
-
-    // VirusTotal
-    if (urlData.virustotal && urlData.virustotal.status === 'success') {
-        const malicious = urlData.virustotal.malicious;
-        const vtClass = malicious > 0 ? 'text-danger' : 'text-success';
-        html += `
-            <div class="analysis-item">
-                <strong>Security Scan:</strong> 
-                <span class="${vtClass}">${malicious} malicious detections</span>
-            </div>
-        `;
-    }
-
-    // Overall URL risk
-    html += `
-        <div class="analysis-item" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color)">
-            <strong>URL Risk Score:</strong> 
-            <span class="badge ${urlData.overall_risk_score >= 50 ? 'badge-high' : urlData.overall_risk_score >= 25 ? 'badge-medium' : 'badge-low'}">
-                ${urlData.overall_risk_score}/100
-            </span>
-        </div>
-    `;
-
-    container.innerHTML = html;
 }
 
 // Display content analysis
-function displayContentAnalysis(contentData) {
-    const container = document.getElementById('contentAnalysis');
+function displayContentAnalysis(contentAnalysis) {
+    const redFlagsCount = document.getElementById('redFlagsCount');
+    const emailStatus = document.getElementById('emailStatus');
+    const salaryValue = document.getElementById('salaryValue');
+    const contentRiskScore = document.getElementById('contentRiskScore');
 
-    let html = `
-        <div class="analysis-item">
-            <strong>Red Flags Found:</strong> 
-            <span class="${contentData.keyword_analysis.flag_count > 3 ? 'text-danger' : 'text-warning'}">
-                ${contentData.keyword_analysis.flag_count} suspicious patterns
-            </span>
-        </div>
-    `;
-
-    // Email analysis
-    if (contentData.email_analysis.is_suspicious) {
-        html += `
-            <div class="analysis-item">
-                <strong>Email:</strong> 
-                <span class="text-danger">⚠️ Suspicious domain</span>
-            </div>
-        `;
-    } else {
-        html += `
-            <div class="analysis-item">
-                <strong>Email:</strong> 
-                <span class="text-success">✓ Appears legitimate</span>
-            </div>
-        `;
+    if (redFlagsCount && contentAnalysis.keyword_analysis) {
+        redFlagsCount.textContent = `${contentAnalysis.keyword_analysis.flag_count} suspicious patterns`;
     }
 
-    // Salary analysis
-    if (contentData.salary_analysis.detected_salary) {
-        const salary = contentData.salary_analysis.detected_salary;
-        const salaryClass = contentData.salary_analysis.risk_score > 20 ? 'text-warning' : 'text-success';
-        html += `
-            <div class="analysis-item">
-                <strong>Salary:</strong> 
-                <span class="${salaryClass}">₹${salary.toLocaleString()}</span>
-            </div>
-        `;
+    if (emailStatus && contentAnalysis.email_analysis) {
+        if (contentAnalysis.email_analysis.is_suspicious) {
+            emailStatus.innerHTML = '<span style="color: #ef4444;">⚠ Suspicious domain</span>';
+        } else {
+            emailStatus.innerHTML = '<span style="color: #10b981;">✓ Professional domain</span>';
+        }
     }
 
-    // Overall content risk
-    html += `
-        <div class="analysis-item" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color)">
-            <strong>Content Risk Score:</strong> 
-            <span class="badge ${contentData.overall_risk_score >= 60 ? 'badge-high' : contentData.overall_risk_score >= 30 ? 'badge-medium' : 'badge-low'}">
-                ${contentData.overall_risk_score}/100
-            </span>
-        </div>
-    `;
+    if (salaryValue && contentAnalysis.salary_analysis) {
+        const salaryInput = document.getElementById('salary');
+        salaryValue.textContent = salaryInput?.value.trim() || 'Not provided';
+    }
 
-    container.innerHTML = html;
+    if (contentRiskScore && contentAnalysis.overall_risk_score !== undefined) {
+        contentRiskScore.textContent = `${Math.round(contentAnalysis.overall_risk_score)}/100`;
+    }
 }
 
 // Display red flags
-function displayRedFlags(contentData) {
-    const container = document.getElementById('redFlags');
-    const flags = contentData.keyword_analysis.detected_flags;
+function displayRedFlags(contentAnalysis) {
+    const redFlagsList = document.getElementById('redFlagsList');
 
-    if (flags.length === 0) {
-        container.innerHTML = '<p class="text-success"><i class="fas fa-check-circle"></i> No major red flags detected</p>';
-        return;
+    if (!redFlagsList) return;
+
+    redFlagsList.innerHTML = '';
+
+    // Add keyword flags
+    if (contentAnalysis.keyword_analysis && contentAnalysis.keyword_analysis.found_keywords) {
+        contentAnalysis.keyword_analysis.found_keywords.forEach(flag => {
+            const li = document.createElement('li');
+            li.textContent = `${flag.keyword} (weight: ${flag.weight})`;
+            li.style.color = flag.severity === 'high' ? '#ef4444' :
+                flag.severity === 'medium' ? '#f59e0b' : '#fbbf24';
+            redFlagsList.appendChild(li);
+        });
     }
 
-    let html = '<ul>';
-    flags.forEach(flag => {
-        const icon = flag.severity === 'high' ? '🚨' : flag.severity === 'medium' ? '⚠️' : 'ℹ️';
-        html += `
-            <li>
-                <span>${icon}</span>
-                <div>
-                    <strong>${flag.keyword}</strong>
-                    <span class="badge ${flag.severity === 'high' ? 'badge-high' : flag.severity === 'medium' ? 'badge-medium' : 'badge-low'}">
-                        +${flag.score} risk
-                    </span>
-                </div>
-            </li>
-        `;
-    });
-    html += '</ul>';
-
-    container.innerHTML = html;
+    // Add email flags
+    if (contentAnalysis.email_analysis && contentAnalysis.email_analysis.reasons) {
+        contentAnalysis.email_analysis.reasons.forEach(reason => {
+            const li = document.createElement('li');
+            li.textContent = reason;
+            li.style.color = '#ef4444';
+            redFlagsList.appendChild(li);
+        });
+    }
 }
 
 // Display recommendations
 function displayRecommendations(recommendations) {
-    const container = document.getElementById('recommendations');
+    const recommendationsList = document.getElementById('recommendationsList');
 
-    let html = '<ul>';
+    if (!recommendationsList || !recommendations) return;
+
+    recommendationsList.innerHTML = '';
+
     recommendations.forEach(rec => {
-        html += `<li><i class="fas fa-lightbulb"></i> ${rec}</li>`;
+        const li = document.createElement('li');
+        li.textContent = rec;
+        recommendationsList.appendChild(li);
     });
-    html += '</ul>';
-
-    container.innerHTML = html;
 }
 
-// Reset form
-function resetForm() {
-    document.getElementById('scamForm').reset();
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('scamForm').style.display = 'block';
-    document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
+// Show loading indicator
+function showLoading() {
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'block';
+    }
+    if (resultsSection) {
+        resultsSection.style.display = 'none';
+    }
 }
 
-// Add smooth reveal animation on scroll
-window.addEventListener('scroll', () => {
-    const elements = document.querySelectorAll('.stat-card, .feature-card, .analysis-card');
-    elements.forEach(element => {
-        const elementTop = element.getBoundingClientRect().top;
-        const windowHeight = window.innerHeight;
-        if (elementTop < windowHeight - 100) {
-            element.style.opacity = '1';
-            element.style.transform = 'translateY(0)';
-        }
-    });
-});
+// Hide loading indicator
+function hideLoading() {
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+}
 
-// Initialize animations
+// Initialize animations on page load
 document.addEventListener('DOMContentLoaded', () => {
-    const cards = document.querySelectorAll('.stat-card, .feature-card');
+    const cards = document.querySelectorAll('.stat-card');
     cards.forEach(card => {
         card.style.opacity = '0';
         card.style.transform = 'translateY(20px)';
         card.style.transition = 'all 0.6s ease';
+    });
+
+    setTimeout(() => {
+        cards.forEach((card, index) => {
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    }, 300);
+});
+
+// Smooth scroll for navigation
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth' });
+        }
     });
 });

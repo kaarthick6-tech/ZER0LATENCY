@@ -23,6 +23,8 @@ class URLChecker:
                 if isinstance(creation_date, list):
                     creation_date = creation_date[0]
                 
+                if creation_date.tzinfo is not None:
+                    creation_date = creation_date.replace(tzinfo=None)
                 age_days = (datetime.now() - creation_date).days
                 return {
                     "status": "success",
@@ -37,6 +39,9 @@ class URLChecker:
     
     def check_virustotal(self, url):
         """Check URL against VirusTotal database"""
+        if not self.virustotal_api_key:
+            return {"status": "skipped", "reason": "VirusTotal API key not configured", "risk_score": 0}
+
         try:
             headers = {
                 "x-apikey": self.virustotal_api_key
@@ -46,7 +51,8 @@ class URLChecker:
             scan_response = requests.post(
                 "https://www.virustotal.com/api/v3/urls",
                 headers=headers,
-                data={"url": url}
+                data={"url": url},
+                timeout=5
             )
             
             if scan_response.status_code == 200:
@@ -57,7 +63,8 @@ class URLChecker:
                 # Get the analysis report
                 report_response = requests.get(
                     f"https://www.virustotal.com/api/v3/analyses/{analysis_id}",
-                    headers=headers
+                    headers=headers,
+                    timeout=5
                 )
                 
                 if report_response.status_code == 200:
@@ -100,7 +107,13 @@ class URLChecker:
     
     def comprehensive_check(self, url):
         """Run all URL checks"""
-        domain_age = self.check_domain_age(url)
+        # WHOIS can block for many seconds when a registry is unreachable.
+        # Skip it when the URL is not HTTPS; the SSL result already flags it.
+        domain_age = self.check_domain_age(url) if url.startswith("https://") else {
+            "status": "skipped",
+            "reason": "WHOIS check skipped for non-HTTPS URL",
+            "risk_score": 30
+        }
         virustotal = self.check_virustotal(url)
         ssl_check = self.check_ssl_certificate(url)
         
@@ -111,9 +124,13 @@ class URLChecker:
             ssl_check.get("risk_score", 0) * 0.1
         )
         
+        overall_risk = round(min(100, total_risk), 2)
+        if not self.virustotal_api_key:
+            overall_risk = max(40, overall_risk)
+
         return {
             "domain_age": domain_age,
             "virustotal": virustotal,
             "ssl_certificate": ssl_check,
-            "overall_risk_score": round(min(100, total_risk), 2)
+            "overall_risk_score": overall_risk
         }
