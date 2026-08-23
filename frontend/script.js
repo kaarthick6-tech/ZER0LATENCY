@@ -86,7 +86,9 @@ function displayResults(data) {
     console.log('Risk Score:', riskScore); // Debug log
 
     // Animate score
-    animateValue(riskScoreValue, 0, Math.round(riskScore), 1000);
+    if (riskScoreValue) {
+        animateValue(riskScoreValue, 0, Math.round(riskScore), 1000);
+    }
 
     // Set color based on risk (FIXED)
     let gradientColor;
@@ -95,23 +97,25 @@ function displayResults(data) {
     if (riskScore >= 70) {
         gradientColor = '#ef4444'; // Red - HIGH RISK
         riskText = 'HIGH RISK';
-        riskLevel.className = 'risk-level text-danger';
+        if (riskLevel) riskLevel.className = 'risk-level text-danger';
     } else if (riskScore >= 40) {
         gradientColor = '#f59e0b'; // Orange - MEDIUM RISK
         riskText = 'MEDIUM RISK';
-        riskLevel.className = 'risk-level text-warning';
+        if (riskLevel) riskLevel.className = 'risk-level text-warning';
     } else {
         gradientColor = '#10b981'; // Green - LOW RISK
         riskText = 'LOW RISK';
-        riskLevel.className = 'risk-level text-success';
+        if (riskLevel) riskLevel.className = 'risk-level text-success';
     }
 
     // Update circle gradient (FIXED - use proper percentage)
     const degrees = (riskScore / 100) * 360;
-    riskCircle.style.background = `conic-gradient(${gradientColor} ${degrees}deg, var(--border-color) ${degrees}deg)`;
+    if (riskScoreCircle) {
+        riskScoreCircle.style.background = `conic-gradient(${gradientColor} ${degrees}deg, var(--border-color) ${degrees}deg)`;
+    }
 
-    riskLevel.textContent = riskText;
-    verdict.textContent = data.verdict;
+    if (riskLevel) riskLevel.textContent = riskText;
+    if (verdict) verdict.textContent = data.verdict || 'No verdict returned';
 
     // Display URL analysis
     displayURLAnalysis(data.url_analysis);
