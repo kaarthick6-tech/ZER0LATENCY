@@ -1,5 +1,6 @@
 // API Base URL
-const API_BASE_URL = 'http://127.0.0.1:8001';
+const API_HOST = window.location.hostname || '127.0.0.1';
+const API_BASE_URL = `http://${API_HOST}:8001`;
 
 // DOM Elements
 const analyzeBtn = document.getElementById('analyzeBtn');
