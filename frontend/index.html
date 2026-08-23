@@ -1,214 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScamCheck - Opportunity Verification System</title>
+    <title>ZER0-LATENCY - ScamCheck Opportunity Verification</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-
 <body>
     <!-- Header -->
     <header class="header">
         <div class="container">
-            <div class="logo">
-                <i class="fas fa-shield-alt"></i>
-                <span>ScamCheck</span>
-            </div>
-            <nav class="nav">
-                <a href="#home">Home</a>
-                <a href="#analyze">Analyze</a>
-                <a href="#about">About</a>
-            </nav>
+            <h1 class="logo">🛡️ ZER0-LATENCY</h1>
+            <p class="tagline">AI-Powered Opportunity Verification System</p>
         </div>
     </header>
 
-    <!-- Hero Section -->
-    <section id="home" class="hero">
+    <!-- Main Form Section -->
+    <section class="form-section">
         <div class="container">
-            <div class="hero-content">
-                <h1>🛡️ Protect Yourself from Job Scams</h1>
-                <p>AI-Powered Opportunity Verification System</p>
-                <p class="subtitle">Analyze job/internship offers in seconds with advanced AI and multi-layer
-                    verification</p>
-                <button class="btn-primary" onclick="scrollToAnalyze()">
-                    <i class="fas fa-search"></i> Check Now
-                </button>
-            </div>
-            <div class="hero-stats">
-                <div class="stat-card">
-                    <i class="fas fa-check-circle"></i>
-                    <h3>7-Layer Verification</h3>
-                    <p>Multiple checks for maximum accuracy</p>
+            <h2 class="section-title">Analyze Job/Internship Opportunity</h2>
+            
+            <form id="scamCheckForm" class="analysis-form">
+                <div class="form-group">
+                    <label for="companyName">Company Name *</label>
+                    <input type="text" id="companyName" placeholder="e.g., Tech Solutions Inc." required>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-brain"></i>
-                    <h3>AI-Powered</h3>
-                    <p>Advanced machine learning analysis</p>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-bolt"></i>
-                    <h3>Instant Results</h3>
-                    <p>Get results in under 10 seconds</p>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Analysis Form Section -->
-    <section id="analyze" class="analysis-section">
-        <div class="container">
-            <div class="section-header">
-                <h2><i class="fas fa-microscope"></i> Analyze Opportunity</h2>
-                <p>Fill in the details of the job/internship offer you received</p>
-            </div>
-
-            <form id="scamForm" class="analysis-form">
-                <div class="form-grid">
+                <div class="form-row">
                     <div class="form-group">
-                        <label for="companyName">
-                            <i class="fas fa-building"></i> Company Name *
-                        </label>
-                        <input type="text" id="companyName" name="company_name" placeholder="e.g., TechCorp Solutions"
-                            required>
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" placeholder="hr@company.com" required>
                     </div>
 
                     <div class="form-group">
-                        <label for="email">
-                            <i class="fas fa-envelope"></i> Email Address *
-                        </label>
-                        <input type="email" id="email" name="email" placeholder="hr@company.com" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="phone">
-                            <i class="fas fa-phone"></i> Phone/WhatsApp Number
-                        </label>
-                        <input type="tel" id="phone" name="phone" placeholder="+91-9876543210">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="website">
-                            <i class="fas fa-globe"></i> Company Website
-                        </label>
-                        <input type="url" id="website" name="website" placeholder="https://www.company.com">
+                        <label for="phone">Phone/WhatsApp</label>
+                        <input type="tel" id="phone" placeholder="+91-9876543210">
                     </div>
                 </div>
 
-                <div class="form-group full-width">
-                    <label for="jobDescription">
-                        <i class="fas fa-file-alt"></i> Job Description / Offer Details *
-                    </label>
-                    <textarea id="jobDescription" name="job_description" rows="6"
-                        placeholder="Paste the complete job offer, email, or message you received..."
-                        required></textarea>
+                <div class="form-group">
+                    <label for="website">Company Website</label>
+                    <input type="url" id="website" placeholder="https://www.company.com">
                 </div>
 
-                <div class="form-group full-width">
-                    <label for="salary">
-                        <i class="fas fa-money-bill-wave"></i> Mentioned Salary (if any)
-                    </label>
-                    <input type="text" id="salary" name="salary" placeholder="e.g., ₹50,000 per month">
+                <div class="form-group">
+                    <label for="jobDescription">Job Description *</label>
+                    <textarea id="jobDescription" rows="6" placeholder="Paste the complete job description here..." required></textarea>
                 </div>
 
-                <button type="submit" class="btn-analyze">
-                    <i class="fas fa-search"></i> Analyze Opportunity
+                <div class="form-group">
+                    <label for="salary">Mentioned Salary</label>
+                    <input type="text" id="salary" placeholder="e.g., ₹45,000 per month">
+                </div>
+
+                <button type="button" id="analyzeBtn" class="analyze-btn">
+                    🔍 Analyze Opportunity
                 </button>
             </form>
-
-            <!-- Loading Animation -->
-            <div id="loading" class="loading" style="display: none;">
-                <div class="spinner"></div>
-                <p>Analyzing with AI... This may take a few seconds</p>
-                <div class="loading-steps">
-                    <div class="step"><i class="fas fa-check"></i> Checking domain age</div>
-                    <div class="step"><i class="fas fa-check"></i> Scanning for red flags</div>
-                    <div class="step"><i class="fas fa-check"></i> Verifying URL reputation</div>
-                    <div class="step"><i class="fas fa-check"></i> AI-powered analysis</div>
-                </div>
-            </div>
-
-            <!-- Results Section -->
-            <div id="results" class="results" style="display: none;">
-                <div class="result-header">
-                    <h2><i class="fas fa-clipboard-check"></i> Analysis Results</h2>
-                </div>
-
-                <!-- Risk Score Display -->
-                <div class="risk-display">
-                    <div class="risk-score-circle" id="riskScoreCircle">
-                        <span id="riskScoreValue">0</span>
-                        <span class="risk-label">Risk Score</span>
-                    </div>
-                    <div class="risk-info">
-                        <h3 id="riskLevel">LOW</h3>
-                        <p id="verdict">Appears legitimate</p>
-                    </div>
-                </div>
-
-                <!-- Detailed Analysis -->
-                <div class="analysis-grid">
-                    <!-- URL Analysis -->
-                    <div class="analysis-card">
-                        <h4><i class="fas fa-link"></i> Website Analysis</h4>
-                        <div id="urlAnalysis"></div>
-                    </div>
-
-                    <!-- Content Analysis -->
-                    <div class="analysis-card">
-                        <h4><i class="fas fa-text"></i> Content Analysis</h4>
-                        <div id="contentAnalysis"></div>
-                    </div>
-
-                    <!-- Red Flags -->
-                    <div class="analysis-card full-width">
-                        <h4><i class="fas fa-exclamation-triangle"></i> Detected Red Flags</h4>
-                        <div id="redFlags"></div>
-                    </div>
-
-                    <!-- Recommendations -->
-                    <div class="analysis-card full-width">
-                        <h4><i class="fas fa-lightbulb"></i> Recommendations</h4>
-                        <ul id="recommendations"></ul>
-                    </div>
-                </div>
-
-                <button class="btn-secondary" onclick="resetForm()">
-                    <i class="fas fa-redo"></i> Check Another Opportunity
-                </button>
-            </div>
         </div>
     </section>
 
-    <!-- About Section -->
-    <section id="about" class="about-section">
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Analyzing opportunity... This may take a few seconds</p>
+    </div>
+
+    <!-- Results Section -->
+    <section id="resultsSection" class="results-section" style="display: none;">
         <div class="container">
-            <div class="section-header">
-                <h2><i class="fas fa-info-circle"></i> About ScamCheck</h2>
+            <h2 class="section-title">Analysis Results</h2>
+
+            <!-- Risk Score Circle -->
+            <div class="risk-score-container">
+                <div class="risk-circle" id="riskScoreCircle">
+                    <div class="risk-value" id="riskScoreValue">0</div>
+                    <div class="risk-label">Risk Score</div>
+                </div>
+                <div class="risk-info">
+                    <h3 class="risk-level" id="riskLevel">-</h3>
+                    <p class="verdict" id="verdict">-</p>
+                </div>
             </div>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <i class="fas fa-brain"></i>
-                    <h3>AI-Powered Analysis</h3>
-                    <p>Uses Google Gemini AI and advanced NLP to detect sophisticated scam patterns</p>
+
+            <!-- Analysis Details -->
+            <div class="analysis-grid">
+                <!-- Website Analysis -->
+                <div class="stat-card">
+                    <h3>🔗 Website Analysis</h3>
+                    <div class="stat-item">
+                        <strong>SSL Certificate:</strong>
+                        <span id="sslStatus">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>URL Risk Score:</strong>
+                        <span id="urlRiskScore" class="score-badge">-</span>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <i class="fas fa-database"></i>
-                    <h3>Multi-Source Verification</h3>
-                    <p>Checks against VirusTotal, WHOIS databases, and scam blacklists</p>
+
+                <!-- Content Analysis -->
+                <div class="stat-card">
+                    <h3>📝 Content Analysis</h3>
+                    <div class="stat-item">
+                        <strong>Red Flags Found:</strong>
+                        <span id="redFlagsCount">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Email:</strong>
+                        <span id="emailStatus">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Salary:</strong>
+                        <span id="salaryValue">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Content Risk Score:</strong>
+                        <span id="contentRiskScore" class="score-badge">-</span>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <i class="fas fa-chart-line"></i>
-                    <h3>Research-Based Detection</h3>
-                    <p>Built on extensive research of common scam tactics and patterns</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-user-shield"></i>
-                    <h3>Student-Focused</h3>
-                    <p>Specifically designed to protect students from fake job/internship offers</p>
-                </div>
+            </div>
+
+            <!-- Red Flags List -->
+            <div class="stat-card">
+                <h3>⚠️ Detected Red Flags</h3>
+                <ul id="redFlagsList" class="flags-list">
+                    <!-- Flags will be added here -->
+                </ul>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="stat-card">
+                <h3>💡 Recommendations</h3>
+                <ul id="recommendationsList" class="recommendations-list">
+                    <!-- Recommendations will be added here -->
+                </ul>
             </div>
         </div>
     </section>
@@ -216,12 +141,11 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 ScamCheck. Built for HackSpora 2.0</p>
+            <p>&copy; 2026 ZER0-LATENCY. Built for HackSpora 2.0</p>
             <p class="hackathon-info">Karpagam Academy of Higher Education, Coimbatore</p>
         </div>
     </footer>
 
     <script src="script.js"></script>
 </body>
-
 </html>
