@@ -105,6 +105,27 @@ async def analyze_opportunity(job: JobOpportunity):
         
         # Weighted final score (URL 40%, Content 60%)
         final_risk_score = round((url_risk * 0.4) + (content_risk * 0.6), 2)
+
+        keyword_analysis = content_analysis.get("keyword_analysis", {})
+        keyword_flags = keyword_analysis.get("found_keywords", [])
+        flag_count = keyword_analysis.get("flag_count", len(keyword_flags))
+        matched_keywords = {flag.get("keyword", "").lower() for flag in keyword_flags}
+
+        if flag_count >= 10:
+            minimum_score = 95
+        elif flag_count >= 8:
+            minimum_score = 85
+        elif flag_count >= 5:
+            minimum_score = 70
+        else:
+            minimum_score = 0
+
+        if "registration fee" in matched_keywords:
+            final_risk_score += 20
+        if {"urgent", "act now"}.issubset(matched_keywords):
+            final_risk_score += 15
+
+        final_risk_score = max(final_risk_score, minimum_score)
         
         # Ensure final score is between 0-100
         final_risk_score = min(100, max(0, final_risk_score))
@@ -129,8 +150,7 @@ async def analyze_opportunity(job: JobOpportunity):
         if content_analysis.get("email_analysis", {}).get("is_suspicious", False):
             recommendations.append("Email domain appears suspicious - look for official company email")
         
-        keyword_flags = content_analysis.get("keyword_analysis", {}).get("flag_count", 0)
-        if keyword_flags > 3:
+        if flag_count > 3:
             recommendations.append("Multiple red flags detected in job description")
         
         salary_risk = content_analysis.get("salary_analysis", {}).get("risk_score", 0)
