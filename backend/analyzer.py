@@ -137,13 +137,27 @@ class ScamAnalyzer:
                 })
                 total_score += weight
         
-        # Calculate risk score (cap at 100)
-        risk_score = min(100, total_score)
+        flag_count = len(found_keywords)
+        multiple_flags_bonus = 40 if flag_count >= 5 else 20 if flag_count >= 3 else 0
+        critical_keywords = {
+            "registration fee",
+            "upfront payment",
+            "no interview",
+            "whatsapp only",
+            "pay to join",
+        }
+        matched_critical_count = sum(
+            keyword in critical_keywords for keyword in (flag["keyword"] for flag in found_keywords)
+        )
+        critical_bonus = matched_critical_count * 15
+        risk_score = min(100, max(0, total_score + multiple_flags_bonus + critical_bonus))
         
         return {
             "found_keywords": found_keywords,
-            "flag_count": len(found_keywords),
+            "flag_count": flag_count,
             "total_weight": total_score,
+            "multiple_flags_bonus": multiple_flags_bonus,
+            "critical_bonus": critical_bonus,
             "keyword_risk_score": risk_score
         }
     
