@@ -43,6 +43,7 @@ async function analyzeOpportunity() {
     const website = document.getElementById('website').value.trim();
     const jobDescription = document.getElementById('jobDescription').value.trim();
     const salary = document.getElementById('salary').value.trim();
+    const mode = document.getElementById('analysisMode').value;
 
     // Validation
     if (!companyName || !email || !jobDescription) {
@@ -60,7 +61,8 @@ async function analyzeOpportunity() {
         phone: phone,
         website: website,
         job_description: jobDescription,
-        salary: salary
+        salary: salary,
+        mode: mode
     };
 
     try {

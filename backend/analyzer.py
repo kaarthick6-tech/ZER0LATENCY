@@ -59,11 +59,18 @@ class ScamAnalyzer:
             "candidate", "experience"
         }
 
-    def validate_input(self, text):
+    def validate_input(self, text, mode="b2c"):
         """Validate that the input resembles a real job posting."""
         text_lower = (text or "").lower()
         tokens = re.findall(r"[a-zA-Z]+", text_lower)
         critical_concepts = self.detect_critical_concepts(text_lower)
+        if mode == "b2b" and re.search(
+            r"\b(wire transfer|urgent payment|change of bank account|bank details changed|"
+            r"gift card|bitcoin|crypto|ceo fraud|overpayment|western union|moneygram|"
+            r"pay immediately|whatsapp only|send proof via whatsapp)\b",
+            text_lower
+        ):
+            critical_concepts.append("B2B payment or invoice fraud indicator")
 
         non_dictionary_like = sum(
             not self._is_dictionary_like_word(token)
@@ -77,7 +84,12 @@ class ScamAnalyzer:
             }
 
         word_count = len(tokens)
-        has_job_tokens = any(token in self.job_related_tokens for token in tokens)
+        b2b_tokens = {
+            "vendor", "vendors", "invoice", "invoices", "supplier", "payment",
+            "transfer", "account", "refund", "purchase", "business"
+        }
+        related_tokens = self.job_related_tokens | (b2b_tokens if mode == "b2b" else set())
+        has_job_tokens = any(token in related_tokens for token in tokens)
         has_critical = len(critical_concepts) > 0
 
         if word_count < 15 and not has_critical:
@@ -128,7 +140,7 @@ class ScamAnalyzer:
                 critical_concepts.append(label)
         return critical_concepts
     
-    def comprehensive_analysis(self, job_data):
+    def comprehensive_analysis(self, job_data, mode="b2c"):
         """Run complete analysis on job opportunity"""
         
         # Extract fields
@@ -138,12 +150,22 @@ class ScamAnalyzer:
         job_description = job_data.get("job_description", "")
         website = job_data.get("website", "")
         salary = job_data.get("salary", "")
+        mode = mode if mode in {"b2c", "b2b"} else "b2c"
         
         # Combine all text for keyword analysis
         all_text = f"{company_name} {email} {phone} {job_description} {website} {salary}"
         
         # Run all analyses
         keyword_analysis = self.analyze_keywords(all_text)
+        if mode == "b2b":
+            b2b_analysis = self.analyze_b2b(all_text, email)
+            keyword_analysis["found_keywords"].extend(b2b_analysis["found_keywords"])
+            keyword_analysis["flag_count"] = len(keyword_analysis["found_keywords"])
+            keyword_analysis["total_weight"] += b2b_analysis["total_weight"]
+            keyword_analysis["keyword_risk_score"] = min(
+                100,
+                max(keyword_analysis["keyword_risk_score"], b2b_analysis["risk_score"])
+            )
         email_analysis = self.analyze_email(email)
         phone_analysis = self.analyze_phone(phone)
         salary_analysis = self.analyze_salary_claim(job_description)
@@ -196,6 +218,83 @@ class ScamAnalyzer:
             "ai_analysis": ai_analysis,
             "overall_risk_score": round(overall_risk, 2),
             "risk_level": "HIGH" if overall_risk >= 70 else "MEDIUM" if overall_risk >= 40 else "LOW"
+        }
+
+    def analyze_b2b(self, text, email):
+        """Additive B2B vendor and invoice scam checks."""
+        text_lower = text.lower()
+        found_keywords = []
+        total_weight = 0
+
+        b2b_keywords = {
+            "wire transfer": (10, "Requests a wire transfer, which is difficult to reverse."),
+            "urgent payment": (10, "Uses urgency around payment, a common business-email scam tactic."),
+            "change of bank account": (10, "Requests a bank account change that should be verified independently."),
+            "bank details changed": (10, "Claims bank details changed, a known invoice-fraud pattern."),
+            "gift card": (9, "Requests gift cards, which legitimate vendors rarely require."),
+            "bitcoin": (9, "Requests cryptocurrency payment instead of a traceable business payment."),
+            "crypto": (9, "Requests cryptocurrency payment instead of a traceable business payment."),
+            "ceo fraud": (10, "Matches an impersonation pattern commonly called CEO fraud."),
+            "invoice": (4, "References an invoice that should be verified against procurement records."),
+            "overpayment": (8, "Uses an overpayment/refund pattern associated with payment scams."),
+            "refund": (7, "Requests a refund that should be independently verified."),
+            "western union": (9, "Requests an irreversible money-transfer service."),
+            "moneygram": (9, "Requests an irreversible money-transfer service."),
+            "pay immediately": (10, "Pressures the business to pay immediately without normal verification."),
+            "whatsapp only": (9, "Requires WhatsApp-only contact instead of an auditable business channel."),
+            "send proof via whatsapp": (9, "Requests payment proof through an informal messaging channel.")
+        }
+
+        for keyword, (weight, reason) in b2b_keywords.items():
+            if keyword in text_lower:
+                found_keywords.append({
+                    "keyword": keyword,
+                    "weight": weight,
+                    "severity": "high" if weight >= 8 else "medium",
+                    "reason": reason
+                })
+                total_weight += weight
+
+        free_email_domains = {"gmail.com", "yahoo.com", "outlook.com", "hotmail.com"}
+        email_domain = email.rsplit("@", 1)[-1].lower() if "@" in email else ""
+        if email_domain in free_email_domains:
+            found_keywords.append({
+                "keyword": f"free email ({email_domain})",
+                "weight": 10,
+                "severity": "high",
+                "reason": "A vendor or invoice request from a free mailbox needs additional verification."
+            })
+            total_weight += 10
+
+        has_urgent_payment = bool(re.search(
+            r"\b(urgent|immediately|asap)\b.{0,35}\b(payment|pay|transfer)\b|"
+            r"\b(payment|pay|transfer)\b.{0,35}\b(urgent|immediately|asap)\b",
+            text_lower
+        ))
+        has_bank_change = bool(re.search(
+            r"\b(change of bank account|bank details changed|new bank details|updated bank account)\b",
+            text_lower
+        ))
+        has_whatsapp_only = "whatsapp only" in text_lower or bool(
+            re.search(r"\b(only|exclusively)\b.{0,15}\bwhatsapp\b", text_lower)
+        )
+
+        risk_score = min(100, total_weight * 1.5)
+        if has_urgent_payment:
+            risk_score = max(risk_score, 70)
+        if has_bank_change:
+            risk_score = max(risk_score, 70)
+        if has_whatsapp_only:
+            risk_score = max(risk_score, 60)
+        if has_urgent_payment or has_bank_change or has_whatsapp_only:
+            risk_score = max(risk_score, 75)
+
+        return {
+            "found_keywords": found_keywords,
+            "total_weight": total_weight,
+            "risk_score": min(100, risk_score),
+            "email_domain": email_domain,
+            "is_free_email": email_domain in free_email_domains
         }
     
     def analyze_keywords(self, text):

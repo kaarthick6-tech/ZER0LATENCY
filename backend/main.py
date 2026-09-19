@@ -41,6 +41,7 @@ class JobOpportunity(BaseModel):
     website: Optional[str] = ""
     job_description: str
     salary: Optional[str] = ""
+    mode: str = "b2c"
 
 class Forensics(BaseModel):
     domain_age_days: Optional[int] = None
@@ -77,6 +78,8 @@ async def analyze_opportunity(job: JobOpportunity):
     Comprehensive scam analysis endpoint
     """
     try:
+        analysis_mode = job.mode.lower() if job.mode.lower() in {"b2c", "b2b"} else "b2c"
+
         def calculate_confidence(content_analysis=None, url_analysis=None):
             confidence = 30
             if job.website.strip():
@@ -111,7 +114,7 @@ async def analyze_opportunity(job: JobOpportunity):
 
             return min(100, max(0, confidence))
 
-        validity = scam_analyzer.validate_input(job.job_description)
+        validity = scam_analyzer.validate_input(job.job_description, mode=analysis_mode)
         if not validity.get("valid", False):
             confidence = calculate_confidence()
             email_domain = job.email.rsplit("@", 1)[-1].lower() if "@" in job.email else ""
@@ -155,10 +158,11 @@ async def analyze_opportunity(job: JobOpportunity):
             "phone": job.phone,
             "website": job.website,
             "job_description": job.job_description,
-            "salary": job.salary
+            "salary": job.salary,
+            "mode": analysis_mode
         }
         
-        content_analysis = scam_analyzer.comprehensive_analysis(job_data)
+        content_analysis = scam_analyzer.comprehensive_analysis(job_data, mode=analysis_mode)
         email_analysis = content_analysis.get("email_analysis", {})
         domain_age_data = url_analysis.get("domain_age", {})
         ssl_data = url_analysis.get("ssl_certificate", {})
