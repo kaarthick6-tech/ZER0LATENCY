@@ -1,6 +1,5 @@
-// API Base URL
-const API_HOST = window.location.hostname || '127.0.0.1';
-const API_BASE_URL = `http://${API_HOST}:8001`;
+// API endpoint
+const API_URL = "http://127.0.0.1:8001/analyze";
 
 // DOM Elements
 const analyzeBtn = document.getElementById('analyzeBtn');
@@ -8,12 +7,27 @@ const loadingIndicator = document.getElementById('loadingIndicator');
 const resultsSection = document.getElementById('resultsSection');
 const riskScoreValue = document.getElementById('riskScoreValue');
 const riskScoreCircle = document.getElementById('riskScoreCircle');
+const riskScoreContainer = document.querySelector('.risk-score-container');
 const riskLevel = document.getElementById('riskLevel');
 const verdict = document.getElementById('verdict');
+const analysisConfidence = document.getElementById('analysisConfidence');
+const sosAlertBox = document.getElementById('sosAlertBox');
+const sosMessageText = document.getElementById('sosMessageText');
+const copySosBtn = document.getElementById('copySosBtn');
+const redFlagsCard = document.getElementById('redFlagsCard');
+const recommendationsCard = document.getElementById('recommendationsCard');
+const guidanceCard = document.getElementById('guidanceCard');
+const guidanceReason = document.getElementById('guidanceReason');
+const analysisDetailsGrid = document.getElementById('analysisDetailsGrid');
+const highlightedTextCard = document.getElementById('highlightedTextCard');
+const highlightedText = document.getElementById('highlightedText');
 
 // Analyze button click handler
 if (analyzeBtn) {
     analyzeBtn.addEventListener('click', analyzeOpportunity);
+}
+if (copySosBtn) {
+    copySosBtn.addEventListener('click', copySOSMessage);
 }
 
 // Analyze opportunity function
@@ -47,7 +61,7 @@ async function analyzeOpportunity() {
 
     try {
         // Send request to backend
-        const response = await fetch(`${API_BASE_URL}/analyze`, {
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -81,21 +95,30 @@ async function analyzeOpportunity() {
 
 // Display analysis results
 function displayResults(data) {
+    const isUnverifiable = data.risk_level === 'UNVERIFIABLE';
     // Update risk score circle
-    const riskScore = Math.min(100, Math.max(0, Number(data.overall_risk_score) || 0));
+    const riskScore = isUnverifiable
+        ? 0
+        : Math.min(100, Math.max(0, Number(data.overall_risk_score) || 0));
 
     console.log('Risk Score:', riskScore); // Debug log
 
     // Animate score
-    if (riskScoreValue) {
+    if (riskScoreValue && !isUnverifiable) {
         animateValue(riskScoreValue, 0, Math.round(riskScore), 1000);
+    } else if (riskScoreValue) {
+        riskScoreValue.textContent = '-';
     }
 
     // Set color based on risk (FIXED)
     let gradientColor;
     let riskText;
 
-    if (riskScore >= 70) {
+    if (isUnverifiable) {
+        gradientColor = '#64748b'; // Slate - UNVERIFIABLE
+        riskText = 'UNVERIFIABLE';
+        if (riskLevel) riskLevel.className = 'risk-level text-slate';
+    } else if (riskScore >= 70) {
         gradientColor = '#ef4444'; // Red - HIGH RISK
         riskText = 'HIGH RISK';
         if (riskLevel) riskLevel.className = 'risk-level text-danger';
@@ -116,19 +139,39 @@ function displayResults(data) {
     }
 
     if (riskLevel) riskLevel.textContent = riskText;
+    if (analysisConfidence) {
+        const confidence = Math.min(100, Math.max(0, Number(data.confidence) || 0));
+        analysisConfidence.textContent = `Analysis Confidence: ${confidence}%`;
+    }
     if (verdict) verdict.textContent = data.verdict || 'No verdict returned';
 
-    // Display URL analysis
-    displayURLAnalysis(data.url_analysis);
+    toggleUnverifiableState(isUnverifiable);
+    if (!isUnverifiable) {
+        // Display URL analysis
+        displayURLAnalysis(data.url_analysis || {});
 
-    // Display content analysis
-    displayContentAnalysis(data.content_analysis);
+        // Display content analysis
+        displayContentAnalysis(data.content_analysis || {});
 
-    // Display red flags
-    displayRedFlags(data.content_analysis);
+        // Display red flags
+        displayRedFlags(data.content_analysis || {});
 
-    // Display recommendations
-    displayRecommendations(data.recommendations);
+        // Display recommendations
+        displayRecommendations(data.recommendations || []);
+        displayHighlightedText(data);
+    } else {
+        const why = data.content_analysis?.input_validity?.reason || 'Insufficient reliable job-offer information.';
+        if (guidanceReason) {
+            guidanceReason.textContent = `Why: ${why}`;
+        }
+        displayHighlightedText(null);
+        displaySOSAlert(null);
+    }
+
+    // Display SOS alert
+    if (!isUnverifiable) {
+        displaySOSAlert(data.sos_message);
+    }
 
     // Show results section
     if (resultsSection) {
@@ -241,6 +284,107 @@ function displayRecommendations(recommendations) {
         li.textContent = rec;
         recommendationsList.appendChild(li);
     });
+}
+
+function toggleUnverifiableState(isUnverifiable) {
+    if (riskScoreContainer) {
+        riskScoreContainer.style.display = isUnverifiable ? 'block' : 'flex';
+    }
+    if (riskScoreCircle) {
+        riskScoreCircle.style.display = isUnverifiable ? 'none' : 'flex';
+    }
+    if (analysisConfidence) {
+        analysisConfidence.style.display = isUnverifiable ? 'none' : 'block';
+    }
+    if (analysisDetailsGrid) {
+        analysisDetailsGrid.style.display = isUnverifiable ? 'none' : 'grid';
+    }
+    if (redFlagsCard) {
+        redFlagsCard.style.display = isUnverifiable ? 'none' : 'block';
+    }
+    if (recommendationsCard) {
+        recommendationsCard.style.display = isUnverifiable ? 'none' : 'block';
+    }
+    if (guidanceCard) {
+        guidanceCard.style.display = isUnverifiable ? 'block' : 'none';
+    }
+    if (!isUnverifiable && guidanceReason) {
+        guidanceReason.textContent = 'Why: -';
+    }
+}
+
+function escapeHtml(value) {
+    return value.replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }[character]));
+}
+
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function displayHighlightedText(data) {
+    if (!highlightedTextCard || !highlightedText) return;
+
+    const isHighlightedTier = data && (data.risk_level === 'HIGH' || data.risk_level === 'MEDIUM');
+    const jobDescription = document.getElementById('jobDescription')?.value.trim() || '';
+    const flags = data?.content_analysis?.keyword_analysis?.found_keywords || [];
+    const usableFlags = flags
+        .filter(flag => flag.keyword && Number(flag.weight) > 0)
+        .sort((left, right) => right.keyword.length - left.keyword.length);
+
+    if (!isHighlightedTier || !jobDescription || !usableFlags.length) {
+        highlightedText.innerHTML = '';
+        highlightedTextCard.style.display = 'none';
+        return;
+    }
+
+    const escapedDescription = escapeHtml(jobDescription);
+    const patterns = usableFlags.map(flag => escapeRegExp(escapeHtml(String(flag.keyword))));
+    const highlightPattern = new RegExp(`(${patterns.join('|')})`, 'gi');
+    highlightedText.innerHTML = escapedDescription.replace(highlightPattern, matchedText => {
+        const matchedFlag = usableFlags.find(flag =>
+            escapeHtml(String(flag.keyword)).toLowerCase() === matchedText.toLowerCase()
+        );
+        const className = Number(matchedFlag?.weight) >= 8 ? 'flag-high' : 'flag-med';
+        return `<mark class="${className}">${matchedText}</mark>`;
+    });
+    highlightedTextCard.style.display = 'block';
+}
+
+// Display SOS section for high-risk jobs
+function displaySOSAlert(sosMessage) {
+    if (!sosAlertBox || !sosMessageText) return;
+
+    if (sosMessage) {
+        sosMessageText.value = sosMessage;
+        sosAlertBox.style.display = 'block';
+    } else {
+        sosMessageText.value = '';
+        sosAlertBox.style.display = 'none';
+    }
+}
+
+// Copy SOS message text
+async function copySOSMessage() {
+    if (!sosMessageText || !sosMessageText.value) return;
+    try {
+        await navigator.clipboard.writeText(sosMessageText.value);
+        if (copySosBtn) {
+            const originalText = copySosBtn.textContent;
+            copySosBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copySosBtn.textContent = originalText;
+            }, 1200);
+        }
+    } catch (error) {
+        console.error('Failed to copy SOS message:', error);
+        alert('Unable to copy message automatically. Please copy it manually.');
+    }
 }
 
 // Show loading indicator

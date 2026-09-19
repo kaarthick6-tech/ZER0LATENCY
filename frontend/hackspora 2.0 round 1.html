@@ -82,15 +82,14 @@
                 </div>
                 <div class="risk-info">
                     <h3 class="risk-level" id="riskLevel">-</h3>
-                    <p class="analysis-confidence" id="analysisConfidence">Analysis Confidence: -</p>
                     <p class="verdict" id="verdict">-</p>
                 </div>
             </div>
 
             <!-- Analysis Details -->
-            <div class="analysis-grid" id="analysisDetailsGrid">
+            <div class="analysis-grid">
                 <!-- Website Analysis -->
-                <div class="stat-card" id="websiteAnalysisCard">
+                <div class="stat-card">
                     <h3>🔗 Website Analysis</h3>
                     <div class="stat-item">
                         <strong>SSL Certificate:</strong>
@@ -103,7 +102,7 @@
                 </div>
 
                 <!-- Content Analysis -->
-                <div class="stat-card" id="contentAnalysisCard">
+                <div class="stat-card">
                     <h3>📝 Content Analysis</h3>
                     <div class="stat-item">
                         <strong>Red Flags Found:</strong>
@@ -124,43 +123,19 @@
                 </div>
             </div>
 
-            <!-- Offer Text Analysis -->
-            <div class="stat-card offer-text-card" id="highlightedTextCard" style="display: none;">
-                <h3>📄 Offer Text Analysis</h3>
-                <div id="highlightedText"></div>
-                <p class="highlight-legend">red = critical flag, yellow = warning flag</p>
-            </div>
-
             <!-- Red Flags List -->
-            <div class="stat-card" id="redFlagsCard">
+            <div class="stat-card">
                 <h3>⚠️ Detected Red Flags</h3>
                 <ul id="redFlagsList" class="flags-list">
                     <!-- Flags will be added here -->
                 </ul>
             </div>
 
-            <!-- SOS Parent Alert -->
-            <div id="sosAlertBox" class="sos-alert-box" style="display: none;">
-                <h3>🚨 SOS Alert - Share with Parents</h3>
-                <textarea id="sosMessageText" rows="4" readonly></textarea>
-                <button type="button" id="copySosBtn" class="copy-sos-btn">Copy Message</button>
-            </div>
-
             <!-- Recommendations -->
-            <div class="stat-card" id="recommendationsCard">
+            <div class="stat-card">
                 <h3>💡 Recommendations</h3>
                 <ul id="recommendationsList" class="recommendations-list">
                     <!-- Recommendations will be added here -->
-                </ul>
-            </div>
-
-            <div id="guidanceCard" class="guidance-card" style="display: none;">
-                <h3>🧭 How to get a reliable verification</h3>
-                <p id="guidanceReason" class="guidance-reason">Why: -</p>
-                <ul>
-                    <li>Paste the full job posting text (at least a complete paragraph).</li>
-                    <li>Provide the recruiter or company email used in the offer.</li>
-                    <li>Add the official company website/job page link.</li>
                 </ul>
             </div>
         </div>

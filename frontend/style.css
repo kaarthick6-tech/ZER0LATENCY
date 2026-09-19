@@ -416,6 +416,47 @@ body {
     color: var(--text-secondary);
 }
 
+.analysis-confidence {
+    font-size: 0.95rem !important;
+    color: #cbd5e1 !important;
+    margin-bottom: 8px;
+}
+
+.offer-text-card {
+    text-align: left;
+}
+
+#highlightedText {
+    background: var(--dark-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    white-space: pre-wrap;
+    line-height: 1.7;
+}
+
+.highlight-legend {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+.flag-high {
+    background: #ef4444;
+    color: #fff;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+
+.flag-med {
+    background: #f59e0b;
+    color: #1f2937;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+
 /* Analysis Grid */
 .analysis-grid {
     display: grid;
@@ -467,6 +508,73 @@ body {
 
 #recommendations li {
     border-left-color: var(--success-color);
+}
+
+.sos-alert-box {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid var(--danger-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.sos-alert-box h3 {
+    color: #fecaca;
+    margin-bottom: 12px;
+}
+
+#sosMessageText {
+    width: 100%;
+    background: var(--dark-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    resize: vertical;
+    font-family: inherit;
+    margin-bottom: 12px;
+}
+
+.copy-sos-btn {
+    background: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.copy-sos-btn:hover {
+    filter: brightness(1.05);
+}
+
+.guidance-card {
+    background: rgba(100, 116, 139, 0.16);
+    border: 1px solid #64748b;
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 24px;
+}
+
+.guidance-card h3 {
+    color: #e2e8f0;
+    margin-bottom: 10px;
+}
+
+.guidance-reason {
+    color: #cbd5e1;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.guidance-card ul {
+    margin-left: 20px;
+}
+
+.guidance-card li {
+    color: #cbd5e1;
+    margin-bottom: 8px;
 }
 
 /* About Section */
@@ -588,6 +696,10 @@ body {
 
 .text-danger {
     color: var(--danger-color);
+}
+
+.text-slate {
+    color: #94a3b8;
 }
 
 .badge {
