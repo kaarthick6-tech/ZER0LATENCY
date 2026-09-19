@@ -42,6 +42,12 @@ class JobOpportunity(BaseModel):
     job_description: str
     salary: Optional[str] = ""
 
+class Forensics(BaseModel):
+    domain_age_days: Optional[int] = None
+    ssl_valid: bool = False
+    is_free_email: bool = False
+    email_provider: str = "Unknown"
+
 class AnalysisResponse(BaseModel):
     overall_risk_score: Optional[float]
     risk_level: str
@@ -51,6 +57,7 @@ class AnalysisResponse(BaseModel):
     verdict: str
     sos_message: Optional[str] = None
     confidence: int
+    forensics: Forensics
 
 @app.get("/")
 async def root():
@@ -107,6 +114,8 @@ async def analyze_opportunity(job: JobOpportunity):
         validity = scam_analyzer.validate_input(job.job_description)
         if not validity.get("valid", False):
             confidence = calculate_confidence()
+            email_domain = job.email.rsplit("@", 1)[-1].lower() if "@" in job.email else ""
+            free_email_domains = {"gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "protonmail.com"}
             return AnalysisResponse(
                 overall_risk_score=None,
                 risk_level="UNVERIFIABLE",
@@ -125,7 +134,13 @@ async def analyze_opportunity(job: JobOpportunity):
                     "Please paste the complete offer text, company email, and website for proper verification."
                 ),
                 sos_message=None,
-                confidence=confidence
+                confidence=confidence,
+                forensics=Forensics(
+                    domain_age_days=None,
+                    ssl_valid=False,
+                    is_free_email=email_domain in free_email_domains,
+                    email_provider=email_domain or "Unknown"
+                )
             )
 
         # Step 1: Analyze URL/Website
@@ -144,6 +159,15 @@ async def analyze_opportunity(job: JobOpportunity):
         }
         
         content_analysis = scam_analyzer.comprehensive_analysis(job_data)
+        email_analysis = content_analysis.get("email_analysis", {})
+        domain_age_data = url_analysis.get("domain_age", {})
+        ssl_data = url_analysis.get("ssl_certificate", {})
+        forensics = Forensics(
+            domain_age_days=url_analysis.get("domain_age_days", domain_age_data.get("age_days")),
+            ssl_valid=url_analysis.get("ssl_valid", ssl_data.get("has_ssl", False)),
+            is_free_email=email_analysis.get("is_free_email", False),
+            email_provider=email_analysis.get("email_provider", email_analysis.get("domain", "Unknown"))
+        )
         
         # Step 3: Calculate final risk score (FIXED)
         url_risk = url_analysis.get("overall_risk_score", 0)
@@ -236,7 +260,8 @@ async def analyze_opportunity(job: JobOpportunity):
             recommendations=recommendations,
             verdict=verdict,
             sos_message=sos_message,
-            confidence=confidence
+            confidence=confidence,
+            forensics=forensics
         )
     
     except Exception as e:

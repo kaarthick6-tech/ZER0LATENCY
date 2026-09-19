@@ -378,7 +378,9 @@ class ScamAnalyzer:
             "is_suspicious": risk_score > 25,
             "risk_score": min(100, risk_score),
             "reasons": reasons,
-            "domain": email_domain
+            "domain": email_domain,
+            "email_provider": email_domain or "Unknown",
+            "is_free_email": email_domain in free_providers
         }
     
     def analyze_phone(self, phone):

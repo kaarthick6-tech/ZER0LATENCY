@@ -457,6 +457,47 @@ body {
     font-weight: 600;
 }
 
+.forensics-card {
+    text-align: left;
+}
+
+.forensics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.forensic-mini-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.forensic-mini-card strong,
+.forensic-mini-card span {
+    display: block;
+}
+
+.forensic-mini-card strong {
+    margin-bottom: 8px;
+}
+
+.forensic-danger {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.forensic-success {
+    color: #10b981;
+    font-weight: 700;
+}
+
+.forensic-unknown {
+    color: #94a3b8;
+    font-weight: 700;
+}
+
 /* Analysis Grid */
 .analysis-grid {
     display: grid;
@@ -672,6 +713,10 @@ body {
     }
 
     .analysis-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .forensics-grid {
         grid-template-columns: 1fr;
     }
 

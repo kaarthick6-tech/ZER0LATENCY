@@ -21,6 +21,10 @@ const guidanceReason = document.getElementById('guidanceReason');
 const analysisDetailsGrid = document.getElementById('analysisDetailsGrid');
 const highlightedTextCard = document.getElementById('highlightedTextCard');
 const highlightedText = document.getElementById('highlightedText');
+const forensicsCard = document.getElementById('forensicsCard');
+const domainAgeValue = document.getElementById('domainAgeValue');
+const sslSecurityValue = document.getElementById('sslSecurityValue');
+const emailProviderValue = document.getElementById('emailProviderValue');
 
 // Analyze button click handler
 if (analyzeBtn) {
@@ -159,12 +163,14 @@ function displayResults(data) {
         // Display recommendations
         displayRecommendations(data.recommendations || []);
         displayHighlightedText(data);
+        displayForensics(data.forensics);
     } else {
         const why = data.content_analysis?.input_validity?.reason || 'Insufficient reliable job-offer information.';
         if (guidanceReason) {
             guidanceReason.textContent = `Why: ${why}`;
         }
         displayHighlightedText(null);
+        displayForensics(null);
         displaySOSAlert(null);
     }
 
@@ -308,9 +314,49 @@ function toggleUnverifiableState(isUnverifiable) {
     if (guidanceCard) {
         guidanceCard.style.display = isUnverifiable ? 'block' : 'none';
     }
+    if (forensicsCard && isUnverifiable) {
+        forensicsCard.style.display = 'none';
+    }
     if (!isUnverifiable && guidanceReason) {
         guidanceReason.textContent = 'Why: -';
     }
+
+}
+
+function displayForensics(forensics) {
+    if (!forensicsCard) return;
+    if (!forensics) {
+        forensicsCard.style.display = 'none';
+        return;
+    }
+
+    if (domainAgeValue) {
+        const ageDays = forensics.domain_age_days;
+        if (ageDays === null || ageDays === undefined) {
+            domainAgeValue.textContent = 'Unknown';
+            domainAgeValue.className = 'forensic-unknown';
+        } else {
+            domainAgeValue.textContent = `${ageDays} days - ${ageDays < 90 ? 'NEW DOMAIN 🚩' : 'Established ✅'}`;
+            domainAgeValue.className = ageDays < 90 ? 'forensic-danger' : 'forensic-success';
+        }
+    }
+
+    if (sslSecurityValue) {
+        sslSecurityValue.textContent = forensics.ssl_valid
+            ? 'HTTPS Encrypted ✅'
+            : 'HTTP Insecure 🚩';
+        sslSecurityValue.className = forensics.ssl_valid ? 'forensic-success' : 'forensic-danger';
+    }
+
+    if (emailProviderValue) {
+        const provider = forensics.email_provider || 'Unknown';
+        emailProviderValue.textContent = forensics.is_free_email
+            ? `${provider} - Free Provider (Gmail/Yahoo) 🚩`
+            : `${provider} - Corporate Domain ✅`;
+        emailProviderValue.className = forensics.is_free_email ? 'forensic-danger' : 'forensic-success';
+    }
+
+    forensicsCard.style.display = 'block';
 }
 
 function escapeHtml(value) {

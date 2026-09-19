@@ -132,5 +132,7 @@ class URLChecker:
             "domain_age": domain_age,
             "virustotal": virustotal,
             "ssl_certificate": ssl_check,
-            "overall_risk_score": overall_risk
+            "overall_risk_score": overall_risk,
+            "domain_age_days": domain_age.get("age_days"),
+            "ssl_valid": ssl_check.get("has_ssl", False)
         }
