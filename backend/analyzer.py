@@ -53,6 +53,80 @@ class ScamAnalyzer:
             "confidential": 5, "exclusive opportunity": 6, "selected candidates": 4,
             "send documents": 6, "id verification": 5, "bank details": 7
         }
+        self.job_related_tokens = {
+            "job", "hire", "hiring", "work", "salary", "position", "intern",
+            "role", "company", "apply", "offer", "pay", "earn", "recruit",
+            "candidate", "experience"
+        }
+
+    def validate_input(self, text):
+        """Validate that the input resembles a real job posting."""
+        text_lower = (text or "").lower()
+        tokens = re.findall(r"[a-zA-Z]+", text_lower)
+        critical_concepts = self.detect_critical_concepts(text_lower)
+
+        non_dictionary_like = sum(
+            not self._is_dictionary_like_word(token)
+            for token in tokens
+        )
+        gibberish_ratio = non_dictionary_like / len(tokens) if tokens else 1.0
+        if gibberish_ratio > 0.40:
+            return {
+                "valid": False,
+                "reason": "Text appears too noisy or gibberish. Please provide the original offer wording."
+            }
+
+        word_count = len(tokens)
+        has_job_tokens = any(token in self.job_related_tokens for token in tokens)
+        has_critical = len(critical_concepts) > 0
+
+        if word_count < 15 and not has_critical:
+            return {
+                "valid": False,
+                "reason": f"Text is too short to analyze ({word_count} words)."
+            }
+
+        if not has_job_tokens and not has_critical:
+            return {
+                "valid": False,
+                "reason": "No job-related content detected."
+            }
+
+        return {"valid": True, "reason": "Input appears valid for scam analysis."}
+
+    def _is_dictionary_like_word(self, token):
+        """Heuristic detector for dictionary-like words."""
+        if len(token) <= 2:
+            return True
+        if re.search(r"(.)\1\1", token):
+            return False
+        if not re.search(r"[aeiou]", token) and len(token) >= 4:
+            return False
+        if re.search(r"[bcdfghjklmnpqrstvwxyz]{6,}", token):
+            return False
+        return True
+
+    def detect_critical_concepts(self, text_lower):
+        """Detect critical high-risk scam concepts used by the validity gate and scoring."""
+        critical_concepts = []
+        concept_patterns = [
+            (
+                r"\b(registration fee|processing fee|training fee|upfront payment|advance payment|deposit)\b",
+                "upfront payment/deposit demand"
+            ),
+            (
+                r"\b(aadhaar|aadhar|bank details|account number|ifsc|otp|cvv|upi pin)\b",
+                "document or sensitive data harvesting"
+            ),
+            (
+                r"\b(payment|deposit|send money|transfer)\b.{0,35}\b(whatsapp|telegram)\b|\b(whatsapp|telegram)\b.{0,35}\b(payment|deposit|send money|transfer)\b",
+                "payment request via whatsapp/telegram"
+            ),
+        ]
+        for pattern, label in concept_patterns:
+            if re.search(pattern, text_lower):
+                critical_concepts.append(label)
+        return critical_concepts
     
     def comprehensive_analysis(self, job_data):
         """Run complete analysis on job opportunity"""
@@ -98,6 +172,8 @@ class ScamAnalyzer:
             salary_score * 0.20 +
             ai_score * 0.15
         )
+        # Do not let averaging dilute a strong set of content red flags.
+        overall_risk = max(overall_risk, keyword_score)
 
         matched_keywords = {flag["keyword"] for flag in keyword_analysis["found_keywords"]}
         payment_keywords = {
@@ -119,7 +195,7 @@ class ScamAnalyzer:
             "salary_analysis": salary_analysis,
             "ai_analysis": ai_analysis,
             "overall_risk_score": round(overall_risk, 2),
-            "risk_level": "HIGH" if overall_risk > 60 else "MEDIUM" if overall_risk > 30 else "LOW"
+            "risk_level": "HIGH" if overall_risk >= 70 else "MEDIUM" if overall_risk >= 40 else "LOW"
         }
     
     def analyze_keywords(self, text):
@@ -127,39 +203,143 @@ class ScamAnalyzer:
         text_lower = text.lower()
         found_keywords = []
         total_score = 0
+        matched_labels = set()
+
+        def add_flag(keyword, weight, reason):
+            nonlocal total_score
+            if keyword in matched_labels:
+                return
+            matched_labels.add(keyword)
+            found_keywords.append({
+                "keyword": keyword,
+                "weight": weight,
+                "severity": "high" if weight >= 8 else "medium" if weight >= 5 else "low",
+                "reason": reason
+            })
+            total_score += weight
         
         for keyword, weight in self.scam_keywords.items():
             if keyword.lower() in text_lower:
-                found_keywords.append({
-                    "keyword": keyword,
-                    "weight": weight,
-                    "severity": "high" if weight >= 8 else "medium" if weight >= 5 else "low"
-                })
-                total_score += weight
+                add_flag(keyword, weight, self._keyword_reason(keyword))
+
+        # Concept-based fuzzy matching for self-phrased scam variants.
+        concept_patterns = [
+            (
+                r"\b(deposit|registration amount|joining amount|security amount|advance)\b",
+                "upfront deposit request",
+                10,
+                "Requests upfront money before employment confirmation."
+            ),
+            (
+                r"\b(daily payout|instant payout|quick payout|same day payout)\b",
+                "rapid payout promise",
+                8,
+                "Promises unusually fast payouts, often used in scam bait."
+            ),
+            (
+                r"\b(message|dm|contact)\b.{0,25}\b(whatsapp|telegram)\b",
+                "informal contact channel",
+                8,
+                "Directs candidates to informal messaging channels instead of official HR."
+            ),
+            (
+                r"\b(without experience|no prior experience|freshers?\s+(welcome|allowed)|anyone can do)\b",
+                "no-experience sales pitch",
+                6,
+                "Overly broad eligibility claims are common in scam postings."
+            ),
+            (
+                r"\b(part[\s-]?time)\b.{0,30}\b(earn|income|salary|payout)\b",
+                "easy part-time earning claim",
+                7,
+                "Combines part-time framing with earning claims that need verification."
+            ),
+        ]
+        for pattern, label, weight, reason in concept_patterns:
+            if re.search(pattern, text_lower):
+                add_flag(label, weight, reason)
+
+        critical_concepts = self.detect_critical_concepts(text_lower)
+        for concept in critical_concepts:
+            if concept == "upfront payment/deposit demand":
+                add_flag(
+                    "critical: upfront payment/deposit",
+                    10,
+                    "Asks for money before hiring confirmation, a major scam indicator."
+                )
+            elif concept == "document or sensitive data harvesting":
+                add_flag(
+                    "critical: document/data harvesting",
+                    10,
+                    "Requests sensitive identity or financial details that scammers commonly misuse."
+                )
+            elif concept == "payment request via whatsapp/telegram":
+                add_flag(
+                    "critical: payment via whatsapp/telegram",
+                    10,
+                    "Combines money request with informal messaging channels, which is highly suspicious."
+                )
         
         flag_count = len(found_keywords)
-        multiple_flags_bonus = 40 if flag_count >= 5 else 20 if flag_count >= 3 else 0
-        critical_keywords = {
-            "registration fee",
-            "upfront payment",
-            "no interview",
-            "whatsapp only",
-            "pay to join",
-        }
-        matched_critical_count = sum(
-            keyword in critical_keywords for keyword in (flag["keyword"] for flag in found_keywords)
-        )
-        critical_bonus = matched_critical_count * 15
-        risk_score = min(100, max(0, total_score + multiple_flags_bonus + critical_bonus))
+        amplified_score = total_score * 1.5
+        critical_indicators = list(critical_concepts)
+        if re.search(r"\b(registration fee|payment|fee)\b", text_lower):
+            critical_indicators.append("payment or fee requested")
+        if re.search(r"\b(urgent|act now|expires)\b", text_lower):
+            critical_indicators.append("urgent pressure language")
+        if (
+            re.search(r"\bno experience\b", text_lower)
+            and re.search(r"(?:₹|\$|£|€)?\s*\d[\d,]{3,}", text_lower)
+            and re.search(r"\b(?:salary|month|monthly|per month|guaranteed|earn)\b", text_lower)
+        ):
+            critical_indicators.append("no experience paired with a high-salary promise")
+        if re.search(r"\b(whatsapp|telegram)\b", text_lower):
+            critical_indicators.append("informal messaging app used for job communication")
+        # Remove duplicates while preserving order.
+        critical_indicators = list(dict.fromkeys(critical_indicators))
+
+        critical_bonus = len(critical_indicators) * 20
+        risk_score = amplified_score + critical_bonus
+        if len(critical_concepts) >= 1:
+            risk_score = max(risk_score, 75)
+        if flag_count >= 5:
+            risk_score = max(risk_score, 75)
+        elif flag_count >= 3:
+            risk_score = max(risk_score, 50)
+        if len(critical_indicators) >= 2:
+            risk_score = max(risk_score, 70)
+        risk_score = min(100, max(0, risk_score))
         
         return {
             "found_keywords": found_keywords,
             "flag_count": flag_count,
             "total_weight": total_score,
-            "multiple_flags_bonus": multiple_flags_bonus,
+            "amplified_score": round(amplified_score, 2),
+            "multiple_flags_bonus": 0,
+            "critical_indicators": critical_indicators,
+            "critical_indicator_count": len(critical_indicators),
             "critical_bonus": critical_bonus,
             "keyword_risk_score": risk_score
         }
+
+    def _keyword_reason(self, keyword):
+        """Return a user-facing explanation for a matched red flag."""
+        if keyword in {"registration fee", "processing fee", "training fee",
+                       "security deposit", "advance payment", "upfront payment",
+                       "pay to join"}:
+            return "Requests money before employment, which is a common job-scam tactic."
+        if keyword in {"urgent", "immediately", "asap", "act now", "hurry",
+                       "don't miss", "expires today"}:
+            return "Uses pressure or urgency to discourage careful verification."
+        if keyword in {"guaranteed salary", "earn thousands", "get rich",
+                       "passive income", "financial freedom"}:
+            return "Promises unusually easy or guaranteed income."
+        if keyword in {"whatsapp only", "telegram", "personal email"}:
+            return "Uses informal or unverifiable communication instead of official channels."
+        if keyword in {"no experience needed", "no skills", "work from home",
+                       "part time", "extra income"}:
+            return "Makes the opportunity sound unusually easy or accessible."
+        return "Matches a pattern commonly associated with fraudulent job postings."
     
     def analyze_email(self, email):
         """Analyze email for suspicious patterns"""
@@ -175,7 +355,7 @@ class ScamAnalyzer:
         
         if email_domain in free_providers:
             reasons.append(f"Using free email provider ({email_domain})")
-            risk_score += 30
+            risk_score += 25
         
         # Check for suspicious patterns
         if re.search(r'\d{3,}', email):
@@ -186,10 +366,13 @@ class ScamAnalyzer:
             reasons.append("Email address unusually short")
             risk_score += 15
         
-        # Check for job-related keywords in email
-        if not any(word in email_domain for word in ["company", "corp", "inc", "ltd", "hr", "careers"]):
-            reasons.append("Domain doesn't match typical business naming")
-            risk_score += 10
+        if (
+            re.search(r"\d", email_domain)
+            or "-" in email_domain
+            or email_domain.endswith((".xyz", ".top", ".click", ".work"))
+        ):
+            reasons.append("Email domain has a suspicious pattern")
+            risk_score += 15
         
         return {
             "is_suspicious": risk_score > 25,

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import re
 from dotenv import load_dotenv
 
 # Import our custom modules
@@ -42,12 +43,14 @@ class JobOpportunity(BaseModel):
     salary: Optional[str] = ""
 
 class AnalysisResponse(BaseModel):
-    overall_risk_score: float
+    overall_risk_score: Optional[float]
     risk_level: str
     url_analysis: dict
     content_analysis: dict
     recommendations: List[str]
     verdict: str
+    sos_message: Optional[str] = None
+    confidence: int
 
 @app.get("/")
 async def root():
@@ -67,6 +70,64 @@ async def analyze_opportunity(job: JobOpportunity):
     Comprehensive scam analysis endpoint
     """
     try:
+        def calculate_confidence(content_analysis=None, url_analysis=None):
+            confidence = 30
+            if job.website.strip():
+                confidence += 20
+            if job.email.strip():
+                confidence += 20
+
+            description_words = len(re.findall(r"\b\w+\b", job.job_description or ""))
+            if description_words > 40:
+                confidence += 15
+
+            has_signal = False
+            if content_analysis:
+                keyword_flags = content_analysis.get("keyword_analysis", {}).get("flag_count", 0)
+                email_info = content_analysis.get("email_analysis", {})
+                phone_score = content_analysis.get("phone_analysis", {}).get("risk_score", 0)
+                salary_score = content_analysis.get("salary_analysis", {}).get("risk_score", 0)
+                has_signal = (
+                    keyword_flags > 0
+                    or bool(email_info.get("reasons"))
+                    or email_info.get("is_suspicious") is False
+                    or phone_score > 0
+                    or salary_score > 0
+                )
+
+            if url_analysis:
+                if url_analysis.get("overall_risk_score") is not None or url_analysis.get("has_ssl") is not None:
+                    has_signal = True
+
+            if has_signal:
+                confidence += 15
+
+            return min(100, max(0, confidence))
+
+        validity = scam_analyzer.validate_input(job.job_description)
+        if not validity.get("valid", False):
+            confidence = calculate_confidence()
+            return AnalysisResponse(
+                overall_risk_score=None,
+                risk_level="UNVERIFIABLE",
+                url_analysis={},
+                content_analysis={
+                    "input_validity": validity,
+                    "keyword_analysis": {"found_keywords": [], "flag_count": 0, "keyword_risk_score": 0},
+                    "email_analysis": {"is_suspicious": False, "risk_score": 0, "reasons": []},
+                    "phone_analysis": {"is_suspicious": False, "risk_score": 0},
+                    "salary_analysis": {"risk_score": 0, "unrealistic": False},
+                    "overall_risk_score": 0
+                },
+                recommendations=[],
+                verdict=(
+                    "This does not look like a valid job offer. We cannot certify it as safe. "
+                    "Please paste the complete offer text, company email, and website for proper verification."
+                ),
+                sos_message=None,
+                confidence=confidence
+            )
+
         # Step 1: Analyze URL/Website
         url_analysis = {}
         if job.website:
@@ -106,21 +167,15 @@ async def analyze_opportunity(job: JobOpportunity):
         keyword_analysis = content_analysis.get("keyword_analysis", {})
         keyword_flags = keyword_analysis.get("found_keywords", [])
         flag_count = keyword_analysis.get("flag_count", len(keyword_flags))
-        matched_keywords = {flag.get("keyword", "").lower() for flag in keyword_flags}
-
-        if flag_count >= 10:
-            minimum_score = 95
-        elif flag_count >= 8:
-            minimum_score = 85
-        elif flag_count >= 5:
-            minimum_score = 70
+        if flag_count >= 5:
+            minimum_score = 75
+        elif flag_count >= 3:
+            minimum_score = 50
         else:
             minimum_score = 0
 
-        if "registration fee" in matched_keywords:
-            final_risk_score += 20
-        if {"urgent", "act now"}.issubset(matched_keywords):
-            final_risk_score += 15
+        if keyword_analysis.get("critical_indicator_count", 0) >= 2:
+            minimum_score = max(minimum_score, 70)
 
         final_risk_score = max(final_risk_score, minimum_score)
         
@@ -128,15 +183,27 @@ async def analyze_opportunity(job: JobOpportunity):
         final_risk_score = min(100, max(0, final_risk_score))
         
         # Determine risk level
+        sos_message = None
         if final_risk_score >= 70:
             risk_level = "HIGH"
-            verdict = "🚨 LIKELY SCAM - AVOID THIS OPPORTUNITY"
+            verdict = "LIKELY SCAM - AVOID THIS OPPORTUNITY"
+            first_two_flags = [
+                flag.get("keyword", "").strip()
+                for flag in keyword_flags
+                if flag.get("keyword", "").strip()
+            ][:2]
+            flags_text = ", ".join(first_two_flags) if first_two_flags else "multiple suspicious signals"
+            sos_message = (
+                f"⚠️ URGENT: Job offer from {job.company_name} is HIGH RISK "
+                f"(Score: {int(round(final_risk_score))}). Red flags: {flags_text}. "
+                "Verify before proceeding."
+            )
         elif final_risk_score >= 40:
             risk_level = "MEDIUM"
-            verdict = "⚠️ SUSPICIOUS - VERIFY CAREFULLY BEFORE PROCEEDING"
+            verdict = "SUSPICIOUS - VERIFY CAREFULLY BEFORE PROCEEDING"
         else:
             risk_level = "LOW"
-            verdict = "✅ APPEARS LEGITIMATE - STILL VERIFY BASIC DETAILS"
+            verdict = "APPEARS LEGITIMATE - STILL VERIFY BASIC DETAILS"
         
         # Generate recommendations
         recommendations = []
@@ -158,6 +225,8 @@ async def analyze_opportunity(job: JobOpportunity):
             recommendations.append("Always verify company through official channels")
             recommendations.append("Never pay upfront fees for jobs")
             recommendations.append("Check company reviews on LinkedIn and Glassdoor")
+
+        confidence = calculate_confidence(content_analysis=content_analysis, url_analysis=url_analysis)
         
         return AnalysisResponse(
             overall_risk_score=final_risk_score,
@@ -165,7 +234,9 @@ async def analyze_opportunity(job: JobOpportunity):
             url_analysis=url_analysis,
             content_analysis=content_analysis,
             recommendations=recommendations,
-            verdict=verdict
+            verdict=verdict,
+            sos_message=sos_message,
+            confidence=confidence
         )
     
     except Exception as e:
